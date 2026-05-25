@@ -1,15 +1,43 @@
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+---------------------------------------------------
+-- PROTEÇÃO COM PCALL
+---------------------------------------------------
+local success, errorMsg = pcall(function()
 
 local player = Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local humanoid = char:WaitForChild("Humanoid")
 
 ---------------------------------------------------
--- KEYBIND SYSTEM
+-- VARIÁVEIS DO SISTEMA UNIVERSAL
 ---------------------------------------------------
-local minimizeKey = Enum.KeyCode.RightShift -- padrão
+local minimizeKey = Enum.KeyCode.RightShift -- Padrão inicial
+local minimizeInputType = Enum.UserInputType.Keyboard -- Tipo inicial
 local minimized = false
+local humanoid = nil
+
+---------------------------------------------------
+-- PROTEÇÃO DE RESPAWN (ATUALIZA HUMANUID)
+---------------------------------------------------
+local function updateHumanoid()
+    local char = player.Character
+    if char then
+        humanoid = char:WaitForChild("Humanoid")
+        return true
+    end
+    return false
+end
+
+-- Inicializa humanoid
+local char = player.Character or player.CharacterAdded:Wait()
+humanoid = char:WaitForChild("Humanoid")
+
+-- Reconecta ao renascer
+player.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+end)
 
 ---------------------------------------------------
 -- GUI ROOT
@@ -26,7 +54,6 @@ main.Size = UDim2.new(0,650,0,380)
 main.Position = UDim2.new(0.5,-325,0.5,-190)
 main.BackgroundColor3 = Color3.fromRGB(18,18,18)
 main.Parent = gui
-
 Instance.new("UICorner", main).CornerRadius = UDim.new(0,8)
 
 ---------------------------------------------------
@@ -94,12 +121,15 @@ end
 minimizeBtn.MouseButton1Click:Connect(toggleGui)
 restoreIcon.MouseButton1Click:Connect(toggleGui)
 
+---------------------------------------------------
+-- SISTEMA DE KEYBIND UNIVERSAL
+---------------------------------------------------
 UIS.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        if input.KeyCode == minimizeKey then
-            toggleGui()
-        end
+    
+    if (input.KeyCode == minimizeKey and input.KeyCode ~= Enum.KeyCode.Unknown) or 
+       (input.UserInputType == minimizeInputType and minimizeKey == Enum.KeyCode.Unknown) then
+        toggleGui()
     end
 end)
 
@@ -111,7 +141,10 @@ sidebar.Size = UDim2.new(0,160,1,-35)
 sidebar.Position = UDim2.new(0,0,0,35)
 sidebar.BackgroundColor3 = Color3.fromRGB(15,15,15)
 sidebar.Parent = main
-Instance.new("UIListLayout", sidebar).Padding = UDim.new(0,5)
+
+local sidebarLayout = Instance.new("UIListLayout")
+sidebarLayout.Parent = sidebar
+sidebarLayout.Padding = UDim.new(0,5)
 
 ---------------------------------------------------
 -- CONTENT
@@ -141,6 +174,24 @@ local localPage = newPage("Local Player")
 local settings = newPage("Settings")
 mainPage.Visible = true
 
+---------------------------------------------------
+-- UIListLayout NAS PÁGINAS (SEM POSIÇÃO MANUAL)
+---------------------------------------------------
+local mainLayout = Instance.new("UIListLayout")
+mainLayout.Parent = mainPage
+mainLayout.Padding = UDim.new(0,15)
+mainLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local localLayout = Instance.new("UIListLayout")
+localLayout.Parent = localPage
+localLayout.Padding = UDim.new(0,15)
+localLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local settingsLayout = Instance.new("UIListLayout")
+settingsLayout.Parent = settings
+settingsLayout.Padding = UDim.new(0,15)
+settingsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
 local function show(page)
     for _,v in pairs(pages) do v.Visible = false end
     page.Visible = true
@@ -167,12 +218,11 @@ tab("Local Player", localPage)
 tab("Settings", settings)
 
 ---------------------------------------------------
--- BUTTON SYSTEM
+-- BUTTON SYSTEM COM UIListLayout (SEM PARÂMETRO Y)
 ---------------------------------------------------
-local function button(parent, text, y, func)
+local function button(parent, text, func)
     local b = Instance.new("TextButton")
     b.Size = UDim2.new(0,300,0,35)
-    b.Position = UDim2.new(0,20,0,y)
     b.BackgroundColor3 = Color3.fromRGB(30,30,30)
     b.TextColor3 = Color3.fromRGB(255,255,255)
     b.Font = Enum.Font.Gotham
@@ -180,84 +230,121 @@ local function button(parent, text, y, func)
     b.Text = text
     b.Parent = parent
     Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-    b.MouseButton1Click:Connect(func)
+    
+    -- Proteção pcall na execução do callback
+    b.MouseButton1Click:Connect(function()
+        pcall(func)
+    end)
 end
 
 ---------------------------------------------------
--- MAIN PAGE
+-- MAIN PAGE (Botões se organizam automaticamente)
 ---------------------------------------------------
-button(mainPage,"Função Exemplo",20,function()
+button(mainPage,"✨ Função Exemplo",function()
     print("Executando função exemplo")
 end)
 
 ---------------------------------------------------
--- LOCAL PLAYER
+-- LOCAL PLAYER (Com proteção de respawn)
 ---------------------------------------------------
-button(localPage,"Super Speed",20,function()
-    humanoid.WalkSpeed = 80
+button(localPage,"⚡ Super Speed",function()
+    if humanoid then
+        humanoid.WalkSpeed = 80
+    end
 end)
-button(localPage,"Reset Speed",65,function()
-    humanoid.WalkSpeed = 16
-end)
 
----------------------------------------------------
--- SETTINGS
----------------------------------------------------
-local info = Instance.new("TextLabel")
-info.Size = UDim2.new(1,0,0,30)
-info.Position = UDim2.new(0,0,0,10)
-info.BackgroundTransparency = 1
-info.Text = "Pressione uma tecla para minimizar"
-info.TextColor3 = Color3.fromRGB(255,255,255)
-info.Font = Enum.Font.Gotham
-info.TextSize = 14
-info.Parent = settings
-
-local box = Instance.new("TextBox")
-box.Size = UDim2.new(0,200,0,35)
-box.Position = UDim2.new(0,20,0,60)
-box.BackgroundColor3 = Color3.fromRGB(30,30,30)
-box.TextColor3 = Color3.fromRGB(255,255,255)
-box.Font = Enum.Font.Gotham
-box.TextSize = 14
-box.PlaceholderText = "RightShift / E / K / F"
-box.Text = ""
-box.Parent = settings
-Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
-
-box.FocusLost:Connect(function()
-    local t = box.Text:lower()
-    local keyMap = {
-        rightshift = Enum.KeyCode.RightShift,
-        e = Enum.KeyCode.E,
-        k = Enum.KeyCode.K,
-        f = Enum.KeyCode.F
-    }
-    if keyMap[t] then
-        minimizeKey = keyMap[t]
-        box.Text = "Tecla: " .. minimizeKey.Name
+button(localPage,"🔄 Reset Speed",function()
+    if humanoid then
+        humanoid.WalkSpeed = 16
     end
 end)
 
 ---------------------------------------------------
--- PLAYER CARD (compacto e estiloso)
+-- SETTINGS (Keybind Universal Profissional)
+---------------------------------------------------
+local info = Instance.new("TextLabel")
+info.Size = UDim2.new(0,300,0,30)
+info.BackgroundTransparency = 1
+info.Text = "Configuração do Atalho de Menu"
+info.TextColor3 = Color3.fromRGB(255,255,255)
+info.Font = Enum.Font.GothamBold
+info.TextSize = 14
+info.TextXAlignment = Enum.TextXAlignment.Center
+info.Parent = settings
+
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(0,300,0,35)
+box.BackgroundColor3 = Color3.fromRGB(30,30,30)
+box.TextColor3 = Color3.fromRGB(150,150,150)
+box.Font = Enum.Font.GothamMedium
+box.TextSize = 14
+box.Text = "Atalho Atual: " .. (minimizeKey ~= Enum.KeyCode.Unknown and minimizeKey.Name or minimizeInputType.Name)
+box.ClearTextOnFocus = false
+box.Parent = settings
+Instance.new("UICorner", box).CornerRadius = UDim.new(0,6)
+
+local bindingConnection = nil
+
+box.Focused:Connect(function()
+    box.Text = "Aguardando qualquer tecla ou clique..."
+    box.TextColor3 = Color3.fromRGB(235,160,50)
+    
+    if bindingConnection then bindingConnection:Disconnect() end
+    
+    bindingConnection = UIS.InputBegan:Connect(function(input, gpe)
+        local inputType = input.UserInputType
+        local keyCode = input.KeyCode
+        
+        if inputType == Enum.UserInputType.MouseMovement or keyCode == Enum.KeyCode.Unknown then 
+            return 
+        end
+        
+        if inputType == Enum.UserInputType.MouseButton1 or 
+           inputType == Enum.UserInputType.MouseButton2 or 
+           inputType == Enum.UserInputType.MouseButton3 then
+            minimizeKey = Enum.KeyCode.Unknown
+            minimizeInputType = inputType
+            box.Text = "Atalho: " .. inputType.Name
+        else
+            minimizeKey = keyCode
+            minimizeInputType = Enum.UserInputType.Keyboard
+            box.Text = "Atalho: " .. keyCode.Name
+        end
+        
+        box.TextColor3 = Color3.fromRGB(100,220,100)
+        
+        bindingConnection:Disconnect()
+        bindingConnection = nil
+        box:ReleaseFocus()
+    end)
+end)
+
+box.FocusLost:Connect(function()
+    if bindingConnection then
+        bindingConnection:Disconnect()
+        bindingConnection = nil
+    end
+    box.Text = "Atalho: " .. (minimizeKey ~= Enum.KeyCode.Unknown and minimizeKey.Name or minimizeInputType.Name)
+    box.TextColor3 = Color3.fromRGB(255,255,255)
+end)
+
+---------------------------------------------------
+-- PLAYER CARD
 ---------------------------------------------------
 local card = Instance.new("Frame")
-card.Size = UDim2.new(0,120,0,40) -- menor e mais compacto
-card.Position = UDim2.new(0,15,1,-45) -- canto inferior esquerdo, sem invadir conteúdo
+card.Size = UDim2.new(0,120,0,40)
+card.Position = UDim2.new(0,15,1,-45)
 card.BackgroundColor3 = Color3.fromRGB(25,25,25)
 card.Parent = main
 Instance.new("UICorner", card).CornerRadius = UDim.new(1,0)
 
--- Avatar com fundo cinza arredondado
 local avatar = Instance.new("ImageLabel")
 avatar.Size = UDim2.new(0,30,0,30)
 avatar.Position = UDim2.new(0,5,0.5,-15)
-avatar.BackgroundColor3 = Color3.fromRGB(35,35,35) -- fundo cinza
+avatar.BackgroundColor3 = Color3.fromRGB(35,35,35)
 avatar.Parent = card
 Instance.new("UICorner", avatar).CornerRadius = UDim.new(1,0)
 
--- Nome do jogador
 local name = Instance.new("TextLabel")
 name.Size = UDim2.new(1,-40,1,0)
 name.Position = UDim2.new(0,40,0,0)
@@ -269,18 +356,20 @@ name.TextXAlignment = Enum.TextXAlignment.Left
 name.Text = player.Name
 name.Parent = card
 
--- Thumbnail do jogador
-local thumb, isReady = Players:GetUserThumbnailAsync(
-    player.UserId,
-    Enum.ThumbnailType.HeadShot,
-    Enum.ThumbnailSize.Size100x100
-)
-if isReady then
-    avatar.Image = thumb
-end
+-- Proteção pcall no thumbnail
+pcall(function()
+    local thumb, isReady = Players:GetUserThumbnailAsync(
+        player.UserId,
+        Enum.ThumbnailType.HeadShot,
+        Enum.ThumbnailSize.Size100x100
+    )
+    if isReady then
+        avatar.Image = thumb
+    end
+end)
 
 ---------------------------------------------------
--- DRAG SYSTEM (mover GUI pela barra superior)
+-- DRAG SYSTEM
 ---------------------------------------------------
 local dragging = false
 local dragStart
@@ -312,3 +401,9 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
+end) -- Fim do pcall
+
+-- Tratamento de erro caso algo dê errado
+if not success then
+    warn("[ZX Hub] Erro ao carregar: " .. tostring(errorMsg))
+end
