@@ -10,12 +10,42 @@ local success, errorMsg = pcall(function()
 local player = Players.LocalPlayer
 
 ---------------------------------------------------
+-- SISTEMA DE ARMAZENAMENTO LOCAL
+---------------------------------------------------
+local function saveConfig(key, value)
+    if writefile then
+        writefile("zxhub_config_"..key..".txt", value)
+    else
+        player:SetAttribute(key, value)
+    end
+end
+
+local function loadConfig(key, default)
+    if readfile and isfile("zxhub_config_"..key..".txt") then
+        return readfile("zxhub_config_"..key..".txt")
+    else
+        return player:GetAttribute(key) or default
+    end
+end
+
+---------------------------------------------------
 -- VARIÁVEIS DO SISTEMA UNIVERSAL
 ---------------------------------------------------
 local minimizeKey = Enum.KeyCode.RightShift -- Padrão inicial
 local minimizeInputType = Enum.UserInputType.Keyboard -- Tipo inicial
 local minimized = false
 local humanoid = nil
+
+-- Carregar configuração anterior
+local savedKey = loadConfig("minimizeKey", minimizeKey.Name)
+local savedType = loadConfig("minimizeType", minimizeInputType.Name)
+
+if Enum.KeyCode[savedKey] then
+    minimizeKey = Enum.KeyCode[savedKey]
+end
+if Enum.UserInputType[savedType] then
+    minimizeInputType = Enum.UserInputType[savedType]
+end
 
 ---------------------------------------------------
 -- PROTEÇÃO DE RESPAWN (ATUALIZA HUMANUID)
@@ -305,10 +335,14 @@ box.Focused:Connect(function()
             minimizeKey = Enum.KeyCode.Unknown
             minimizeInputType = inputType
             box.Text = "Atalho: " .. inputType.Name
+            saveConfig("minimizeKey", minimizeKey.Name)
+            saveConfig("minimizeType", minimizeInputType.Name)
         else
             minimizeKey = keyCode
             minimizeInputType = Enum.UserInputType.Keyboard
             box.Text = "Atalho: " .. keyCode.Name
+            saveConfig("minimizeKey", minimizeKey.Name)
+            saveConfig("minimizeType", minimizeInputType.Name)
         end
         
         box.TextColor3 = Color3.fromRGB(100,220,100)
